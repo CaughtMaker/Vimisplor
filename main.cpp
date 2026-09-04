@@ -66,8 +66,7 @@ char take_input(){
 
 std::optional<fs::directory_entry> navigation(fs::path my_path){
     std::cout << "\033[2J\033[H";
-
-
+    
     char assigned_letters[26] = {'a','s','d','f','g','h','j','k','l','q','w','e','r','t','y','u','i','o','p','z','x','c','v','b','n','m'};
     int count = 0;
     std::vector<fs::directory_entry> files;
@@ -75,13 +74,15 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
     int page_numbers = page_count(fs::directory_entry(my_path));
     int current_page = 0;
 
-    const int limit = 10;
+    const int limit = 20;
     for(const auto & entry : fs::directory_iterator(my_path)){
         files.push_back(entry);
     }
 
     while(true){
         std::cout << "\033[2J\033[H";
+        std::cout << "***********************************************************************************\n";
+
         int start = current_page * limit;
         int end = std::min(start + limit, static_cast<int>(files.size()));
         count = 0;
@@ -109,8 +110,10 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
             count++;
             std::cout << "\033[0m"<<std::endl;
         }
+
+        std::cout << "***********************************************************************************\n";
         std::cout << "Page " << (current_page + 1) << "/" << page_numbers << "\n";
-        std::cout << "[.] next page  [,] prev page [;] prev folder [/] quit\n";
+        std::cout <<"\033[34m" << "[.] next page  [,] prev page [;] prev folder [/] quit\n" <<"\033[0m";
 
         char chosen = take_input();
         int index = -1;
@@ -164,10 +167,11 @@ void open_file(const fs::path& p){
 }
 
 int main() {
-    std::string input;
-    std::cout << "Enter a path: ";
-    std::getline(std::cin,input);
+    std::string input = "C:\\Users\\Admins\\Desktop";
+    
     fs::path my_path = input;
+
+    
 
     if(check_path(input)){
         std::optional<fs::directory_entry> result = navigation(my_path);
