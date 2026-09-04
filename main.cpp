@@ -6,6 +6,7 @@
 #include <optional>
 #include <shellapi.h>
 
+
 namespace fs = std::filesystem;
 
 bool check_path(fs::path my_path){
@@ -30,6 +31,16 @@ time_t last_write_time(auto p){
     return cftime;
 }
 
+std::size_t count_entries(const fs::path& p){
+    return std::distance(fs::directory_iterator(p), fs::directory_iterator{});
+}
+
+int page_count(fs::directory_entry folder){
+    int entry_number = count_entries(folder.path());
+    int result = (entry_number + 10 - 1) / 10;
+    return result;
+}
+
 char take_input(){
         HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -47,9 +58,6 @@ char take_input(){
     DWORD read;
     ReadConsole(hIn, &c, 1, &read, NULL);
 
-    std::cout << "\nYou pressed: '" << c << "' (0x"
-               << std::hex << (int)(unsigned char)c << ")\n";
-
     SetConsoleMode(hIn, originalMode); // restore
 
     return c;
@@ -57,27 +65,52 @@ char take_input(){
 
 
 std::optional<fs::directory_entry> navigation(fs::path my_path){
+    std::cout << "\033[2J\033[H";
+
+
     char assigned_letters[26] = {'a','s','d','f','g','h','j','k','l','q','w','e','r','t','y','u','i','o','p','z','x','c','v','b','n','m'};
     int count = 0;
     std::vector<fs::directory_entry> files;
 
+    int page_numbers = page_count(fs::directory_entry(my_path));
+    int current_page = 0;
+
+    const int limit = 10;
     for(const auto & entry : fs::directory_iterator(my_path)){
-        std::cout << entry.path().filename()<< "\t";
-        if (entry.is_regular_file()){
-            std::cout << "Size: "<<(fs::file_size(entry))/1000 << "KB Last Write Time: ";
-            auto ftime = fs::last_write_time(entry);
-            time_t cftime = last_write_time(ftime);
-            std::cout << std::asctime(std::localtime(&cftime));
-                
-        }
-        else{
-            std::cout << "Directory";
-            }
-        std::cout << ", " << assigned_letters[count];
-        count++;
-        std::cout << std::endl;
         files.push_back(entry);
     }
+
+    while(true){
+        std::cout << "\033[2J\033[H";
+        int start = current_page * limit;
+        int end = std::min(start + limit, static_cast<int>(files.size()));
+        count = 0;
+        for (int i = start; i<end; ++i){
+
+            const auto& entry = files[i];
+            int letter_index = i-start;
+
+
+            if (entry.is_regular_file()){
+                std::cout << entry.path().filename()<< "\t";
+                std::cout << "Size: "<<(fs::file_size(entry))/1000 << "KB Last Write Time: ";
+                auto ftime = fs::last_write_time(entry);
+                time_t cftime = last_write_time(ftime);
+                std::string ts = std::asctime(std::localtime(&cftime));
+                ts.pop_back();
+                std::cout << ts;
+            }
+            else{
+                std::cout << "\033[33m" << entry.path().filename()<< "\t";
+                std::cout << "Directory";
+                }
+            std::cout << ","<<"\033[0m"<< "[" << "\033[32m" << assigned_letters[count] <<"\033[0m"<<"]";
+        
+            count++;
+            std::cout << "\033[0m"<<std::endl;
+        }
+        std::cout << "Page " << (current_page + 1) << "/" << page_numbers << "\n";
+        std::cout << "[.] next page  [,] prev page [;] prev folder [/] quit\n";
 
         char chosen = take_input();
         int index = -1;
@@ -89,22 +122,35 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
             }
         }
         
-        if (index >= 0 && index < static_cast<int>(files.size())) {
-            std::cout << "You chose " << files[index] << ".\n";
-            return files[index];
+        int global_index = start+index;
+        
+        if (index >= 0 && global_index < end) {
+            std::cout << "You chose " << files[global_index] << ".\n";
+            return files[global_index];
         } 
-        else if (chosen == '/'){
-            return std::nullopt;   // <-- missing semicolon fixed too
+        else if (chosen == '.'){
+            if (current_page + 1 < page_numbers) current_page++;
         }
         else if (chosen == ','){
+            if (current_page > 0) current_page--;
+        }
+        else if (chosen == '/'){
+            
+            return std::nullopt;   // <-- missing semicolon fixed too
+        }
+        else if (chosen == ';'){
             fs::directory_entry parent_entry{my_path.parent_path()};
+           
             return parent_entry;
         }
         else {
             std::cout << "Invalid selection.\n";
-            return std::nullopt;   // treat "invalid" as stop too, rather than an empty entry
+            
+            return std::nullopt;   
         }
     }
+}
+
 
 void open_file(const fs::path& p){
     ShellExecuteW(
@@ -131,10 +177,19 @@ int main() {
                 result = navigation(result->path());
             }
             else if(result->is_regular_file()){
-                open_file(result->path());
+                std::cout << "\nAre you sure you want to open "<<result->path().filename() << "[" << "\033[32m" <<"Y"<<"\033[0m"<<"/"<< "\033[32m" <<"N"<< "\033[0m" << "]\n";
+                char x = take_input();
+                if (x == 'y'){
+                    open_file(result->path());
+                }
+                else{
+                    result = navigation(result->path().parent_path());
+                }
+                break;
             }
         }
     }
+
     return 0;
 }
 
