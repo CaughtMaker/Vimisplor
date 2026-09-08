@@ -52,7 +52,7 @@ char take_input(){
     rawMode &= ~ENABLE_ECHO_INPUT;   // don't echo typed characters
     SetConsoleMode(hIn, rawMode);
 
-    std::cout << "Press any key...\n";
+
 
     char c;
     DWORD read;
@@ -63,6 +63,118 @@ char take_input(){
     return c;
 }
 
+std::vector<fs::directory_entry> search_result(std::string target, fs::path path){
+    std::vector<fs::directory_entry> matching_values;
+
+    for(const auto & entry : fs::directory_iterator(path)){
+        std::string name = entry.path().filename().string();
+        for (int i = 0; i<name.length(); i++){
+            if (i+target.length() >= name.length()){
+                break;
+            }
+            //'std::cout << name.substr(i,i+(target.length()-1)) << std::endl;
+            if (name.substr(i,target.length()) == target){
+                matching_values.push_back(entry);
+                break;
+            }
+        }
+    }
+
+    return matching_values;
+}
+
+std::optional<fs::directory_entry> search (fs::path path){
+    std::string name;
+    std::cout<< "\nEnter a key word: ";
+    std::vector<fs::directory_entry> x;
+    while(true){
+        char c = take_input();
+        
+        if (c == '/'){
+            break;
+        }
+        name.push_back(c);
+        
+        x = search_result(name,path);
+
+        std::cout << "\033[2J\033[H";
+        for (int i = 0; i<x.size();i++){
+            std::cout<< x[i].path().filename() << std::endl;
+        }
+        std::cout << "Enter a key word: ";
+        std::cout<< " " << name;
+    }
+
+    char assigned_letters[26] = {'a','s','d','f','g','h','j','k','l','q','w','e','r','t','y','u','i','o','p','z','x','c','v','b','n','m'};
+    int count = 0;
+
+
+    int current_page = 0;
+    int page_numbers = (x.size() + 10 - 1) / 10;
+    const int limit = 15;
+
+    while(true){
+        std::cout << "\033[2J\033[H";
+        std::cout << "***********************************************************************************\n";
+
+        int start = current_page * limit;
+        int end = std::min(start + limit, static_cast<int>(x.size()));
+        count = 0;
+        for (int i = start; i<end;i++){
+            std::cout <<"["<< "\033[32m" << assigned_letters[i] <<"\033[0m"<<"]";
+
+            if (x[i].is_directory()){
+               std::cout << "\033[33m" << x[i].path().filename() << std::endl <<"\033[0m";
+            }
+            else{
+                std::cout << x[i].path().filename();
+            }
+
+            std::cout << std::endl;
+        }
+        std::cout << "***********************************************************************************\n";
+        std::cout << "Page " << (current_page + 1) << "/" <<page_numbers<< "\n";
+        std::cout <<"\033[34m" << "[.] next page  [,] prev page [;] prev folder [/] quit\n" <<"\033[0m";
+        std::cout <<"Press any key... ";
+        char chosen = take_input();
+        int index = -1;
+   
+        
+        for (int i = 0; i<26;i++){
+            if (chosen == assigned_letters[i]){
+                index = i;
+            }
+        }
+        
+        int global_index = start+index;
+        
+        if (index >= 0 && global_index < end) {
+            std::cout << "You chose " << x[global_index] << ".\n";
+            return x[global_index];
+        } 
+        else if (chosen == '.'){
+
+            if (current_page + 1 < page_numbers) current_page++;
+        }
+
+        else if (chosen == ','){
+            if (current_page > 0) current_page--;
+        }
+        else if (chosen == '/'){
+            fs::directory_entry y{path};
+            return y;   // <-- missing semicolon fixed too
+        }
+
+        else {
+            std::cout << "Invalid selection.\n";
+            
+            return std::nullopt;   
+        }
+    }
+
+
+
+}
 
 std::optional<fs::directory_entry> navigation(fs::path my_path){
     std::cout << "\033[2J\033[H";
@@ -74,7 +186,7 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
     int page_numbers = page_count(fs::directory_entry(my_path));
     int current_page = 0;
 
-    const int limit = 20;
+    const int limit = 15;
     for(const auto & entry : fs::directory_iterator(my_path)){
         files.push_back(entry);
     }
@@ -91,7 +203,7 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
             const auto& entry = files[i];
             int letter_index = i-start;
 
-
+            std::cout<<"\033[0m"<< "[" << "\033[32m" << assigned_letters[count] <<"\033[0m"<<"]" << "   ";
             if (entry.is_regular_file()){
                 std::cout << entry.path().filename()<< "\t";
                 std::cout << "Size: "<<(fs::file_size(entry))/1000 << "KB Last Write Time: ";
@@ -105,7 +217,6 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
                 std::cout << "\033[33m" << entry.path().filename()<< "\t";
                 std::cout << "Directory";
                 }
-            std::cout << ","<<"\033[0m"<< "[" << "\033[32m" << assigned_letters[count] <<"\033[0m"<<"]";
         
             count++;
             std::cout << "\033[0m"<<std::endl;
@@ -113,8 +224,8 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
 
         std::cout << "***********************************************************************************\n";
         std::cout << "Page " << (current_page + 1) << "/" << page_numbers << "\n";
-        std::cout <<"\033[34m" << "[.] next page  [,] prev page [;] prev folder [/] quit\n" <<"\033[0m";
-
+        std::cout <<"\033[34m" << "[.] next page  [,] prev page [;] prev folder [/] quit ['] search\n" <<"\033[0m";
+        std::cout <<"Press any key... ";
         char chosen = take_input();
         int index = -1;
    
@@ -133,6 +244,10 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
         } 
         else if (chosen == '.'){
             if (current_page + 1 < page_numbers) current_page++;
+        }
+        else if (chosen == '\''){
+            return(search(my_path));
+
         }
         else if (chosen == ','){
             if (current_page > 0) current_page--;
