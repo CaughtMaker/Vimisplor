@@ -57,6 +57,7 @@ char take_input(){
     char c;
     DWORD read;
     ReadConsole(hIn, &c, 1, &read, NULL);
+    
 
     SetConsoleMode(hIn, originalMode); // restore
 
@@ -85,23 +86,43 @@ std::vector<fs::directory_entry> search_result(std::string target, fs::path path
 
 std::optional<fs::directory_entry> search (fs::path path){
     std::string name;
-    std::cout<< "\nEnter a key word: ";
+    std::cout << "\033[2J\033[H";
+    std::cout << "***********************************************************************************\n";
+    for (int i = 0; i<15;i++){
+        std::cout<<std::endl;
+    }
+    std::cout << "***********************************************************************************\n";
+    std::cout<< "\n"<<"\033[32m"<<"Enter a key word:"<<"\033[0m";
     std::vector<fs::directory_entry> x;
     while(true){
         char c = take_input();
         
-        if (c == '/'){
+        if (c == '\''){
             break;
         }
-        name.push_back(c);
-        
+        if (c == '\b'){
+            name.pop_back();
+        }
+        else{
+            name.push_back(c);
+        }
         x = search_result(name,path);
 
         std::cout << "\033[2J\033[H";
+        std::cout << "***********************************************************************************\n";
         for (int i = 0; i<x.size();i++){
             std::cout<< x[i].path().filename() << std::endl;
         }
-        std::cout << "Enter a key word: ";
+        int remainder = 0;
+        if (x.size() < 15){
+            remainder = 15 - x.size();
+        }
+        for(int i = 0; i<remainder; i++){
+            std::cout<< std:: endl;
+        }
+        std::cout << "***********************************************************************************\n";
+        std::cout <<"\033[34m"<<std::endl<< "Press [\'] to enter" << std::endl;
+        std::cout << "\033[32m"<< "Enter a key word: "<<"\033[0m";
         std::cout<< " " << name;
     }
 
@@ -132,9 +153,18 @@ std::optional<fs::directory_entry> search (fs::path path){
 
             std::cout << std::endl;
         }
+        int remainder = 0;
+        if (count < 15){
+            remainder = 15 - count;
+        }
+        for(int i = 0; i<remainder; i++){
+            std::cout<< std:: endl;
+        }
+
         std::cout << "***********************************************************************************\n";
         std::cout << "Page " << (current_page + 1) << "/" <<page_numbers<< "\n";
         std::cout <<"\033[34m" << "[.] next page  [,] prev page [;] prev folder [/] quit\n" <<"\033[0m";
+    
         std::cout <<"Press any key... ";
         char chosen = take_input();
         int index = -1;
@@ -176,6 +206,16 @@ std::optional<fs::directory_entry> search (fs::path path){
 
 }
 
+fs::path custom_path(){
+    std::cout << "\nEnter a path: ";
+    std::string path;
+    std::getline(std::cin, path);
+
+    
+    return fs::path{path}; 
+}
+
+
 std::optional<fs::directory_entry> navigation(fs::path my_path){
     std::cout << "\033[2J\033[H";
     
@@ -205,8 +245,25 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
 
             std::cout<<"\033[0m"<< "[" << "\033[32m" << assigned_letters[count] <<"\033[0m"<<"]" << "   ";
             if (entry.is_regular_file()){
-                std::cout << entry.path().filename()<< "\t";
-                std::cout << "Size: "<<(fs::file_size(entry))/1000 << "KB Last Write Time: ";
+                int l = 20;
+                std::string name = entry.path().filename().string();
+                if (name.length() > l){
+                    int remainder = name.length() - l;
+                    for(int i = 0; i < remainder+3; i++){
+                        name.pop_back();
+                    }
+                    std::cout << name;
+                    std::cout << "...";
+                }
+                else{
+                    int remainder =  l - name.length();
+                    std::cout<<name;
+                    for(int i = 0; i < remainder; i++){
+                        std::cout<<" ";
+                    }
+
+                }
+                std::cout << "\tSize: "<<(fs::file_size(entry))/1000 << "KB Last Write Time: ";
                 auto ftime = fs::last_write_time(entry);
                 time_t cftime = last_write_time(ftime);
                 std::string ts = std::asctime(std::localtime(&cftime));
@@ -214,17 +271,46 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
                 std::cout << ts;
             }
             else{
-                std::cout << "\033[33m" << entry.path().filename()<< "\t";
-                std::cout << "Directory";
+                int l = 20;
+                std::string name = entry.path().filename().string();
+                std::cout<<"\033[33m";
+                if (name.length() > l){
+                    int remainder = name.length() - l;
+                    for(int i = 0; i < remainder+3; i++){
+                        name.pop_back();
+                    }
+                    std::cout << name;
+                    std::cout << "...";
+                }
+                else{
+                    int remainder = l - name.length();
+                    std::cout<<name;
+                    for(int i = 0; i < remainder; i++){
+                        std::cout<<" ";
+                    }
+
+                }
+                //std::cout << "\033[33m" << entry.path().filename()<< "\t";
+                std::cout << "\tDirectory";
                 }
         
             count++;
             std::cout << "\033[0m"<<std::endl;
         }
+        int remainder = 0;
+        if (count < 15){
+            remainder = 15 - count;
+        }
+        for(int i = 0; i<remainder; i++){
+            std::cout<< std:: endl;
+        }
 
         std::cout << "***********************************************************************************\n";
         std::cout << "Page " << (current_page + 1) << "/" << page_numbers << "\n";
-        std::cout <<"\033[34m" << "[.] next page  [,] prev page [;] prev folder [/] quit ['] search\n" <<"\033[0m";
+        std::cout <<"\033[34m" << "[.] next page  [,] prev page [;] prev folder [/] quit ['] search [`] custom path\n" <<"\033[0m";
+
+        
+
         std::cout <<"Press any key... ";
         char chosen = take_input();
         int index = -1;
@@ -261,10 +347,24 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
            
             return parent_entry;
         }
+        else if (chosen == '`'){
+            fs::path custom_p = custom_path();
+
+            if (check_path(custom_p)){
+                fs::directory_entry x(custom_p);
+                return x;
+            }
+            else{
+                fs::directory_entry current_spot(my_path);
+                return current_spot;
+            }
+            
+        }
         else {
             std::cout << "Invalid selection.\n";
             
-            return std::nullopt;   
+            fs::directory_entry current_spot(my_path);
+            return current_spot;
         }
     }
 }
