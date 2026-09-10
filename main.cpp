@@ -5,6 +5,9 @@
 #include <vector>
 #include <optional>
 #include <shellapi.h>
+#include <numeric>
+#include <algorithm>
+
 
 
 namespace fs = std::filesystem;
@@ -19,6 +22,18 @@ bool check_path(fs::path my_path){
         //std:: cout << "Cannot Find";
         return false;
     }
+}
+
+
+template <typename T>
+std::vector<size_t> argsort(const std::vector<T>& v) {
+    std::vector<size_t> idx(v.size());
+    std::iota(idx.begin(), idx.end(), 0);  // fill with 0, 1, 2, ...
+
+    std::sort(idx.begin(), idx.end(),
+        [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
+
+    return idx;
 }
 
 time_t last_write_time(auto p){
@@ -227,9 +242,17 @@ std::optional<fs::directory_entry> navigation(fs::path my_path){
     int current_page = 0;
 
     const int limit = 15;
+    std::vector<int> bing_bong;
+
     for(const auto & entry : fs::directory_iterator(my_path)){
         files.push_back(entry);
     }
+
+    std::stable_sort(files.begin(), files.end(),
+    [](const fs::directory_entry& a, const fs::directory_entry& b) {
+        return a.is_directory() && !b.is_directory(); // dirs before files
+    });
+
 
     while(true){
         std::cout << "\033[2J\033[H";
