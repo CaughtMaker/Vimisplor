@@ -405,8 +405,11 @@ void open_file(const fs::path& p){
 }
 
 int main() {
-    std::string input = "C:\\Users\\Admins\\Desktop";
-    
+    std::string input;
+    std::cout<<"Enter a path to start with:  ";
+
+    std::getline(std::cin, input);
+
     fs::path my_path = input;
 
     
@@ -430,6 +433,9 @@ int main() {
                 break;
             }
         }
+    }
+    else{
+        std::cout<<"that isn't a path man";
     }
 
     return 0;
